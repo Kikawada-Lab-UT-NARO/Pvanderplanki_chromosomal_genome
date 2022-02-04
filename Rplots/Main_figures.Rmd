@@ -1,0 +1,213 @@
+---
+title: "Main figures for Yoshida et al. 2022"
+author: "Yuki Yoshida"
+date: "Dec 22, 2021"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+
+- This notebooks to reproduce the figures that we have created for the manuscript "High quality assembly of anhydrobiotic midge genome provides insights on a single chromosome-based emerging of extreme desiccation tolerance".
+- Figures were mainly created with R and were collated with Adobe Illustrator.
+- In several figures, the chromosome names and not-required headers are modified, however the plots are not modified in any way.
+- The aspect ratio/size of the figures may differ from the published plots. 
+
+# Requirements
+```{r, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(scales)
+library(dplyr)
+library(ggsci)
+library(data.table)
+library(ggalluvial)
+library(gggenes)
+pvcolor = c("#1D71A9", "#EF7C21", "#359939", "#CA2828")
+```
+
+# Figure 1
+## Fig 1c
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_1c_Pv11_5.2.final.fasta.fai.bedtoolsMakewindows.100000.bed.beddtoolsNuc", header=T)
+ggplot(data,aes(x=X2_usercol/1000000, y=X5_pct_gc, group=X1_usercol, color=X1_usercol))+ geom_line() + facet_grid(.~X1_usercol, space="free", scale="free") + theme_classic() + xlab("Position in chromosome") + ylab("GC ratio") + guides(color="none")  + scale_x_continuous(label=comma,breaks=seq(0, 30, 10))  + theme(strip.background=element_blank())  + scale_color_manual(values=pvcolor)
+ggsave("plots/fig_1c_Pv11_5.2.final.fasta.fai.bedtoolsMakewindows.100000.bed.beddtoolsNuc.svg")
+
+TukeyHSD(aov(X5_pct_gc ~ X1_usercol, data=data))
+```
+
+## Fig 1d
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_1d_calculate_gc_ratio_for_chr.pl.out", header=F)
+
+data.suma <-data %>% group_by(V1) %>% summarize(mean=mean(V5))
+data.suma
+ggplot(data, aes(x=V3/1000000, y=V5, color=V1)) + geom_point(size=0.1) + facet_grid(.~V1, space="free", scale="free") + theme_classic() + theme(strip.background=element_blank(), strip.text=element_blank(), legend.position = "none") + xlab("Position in chromosome (MB)") + ylab("GC ratio of gene") + geom_hline(data=data.suma, aes( yintercept=mean), color="black") + scale_color_manual(values=pvcolor) 
+ggsave("plots/fig_1d_calculate_gc_ratio_for_chr.pl.out.svg")
+
+TukeyHSD(aov(V5 ~ V1, data=data))
+```
+
+
+## Fig 1e
+```{r, warning=FALSE, message=FALSE}
+TASH_PI_INTRA <- fread("data/fig_1e_tash_tash_pi_50kbp_along_full_genome_pv11_5.0_with_all_positions.csv", skip = 2)
+colnames(TASH_PI_INTRA) <- c("V1", "pi", "chr", "row_number")
+
+TASH_PI_INTRA$chr <- paste0("chr", TASH_PI_INTRA$chr)
+TASH_PI_INTRA$chr <- as.character(TASH_PI_INTRA$chr)
+TASH_PI_INTRA <- TASH_PI_INTRA[!grepl(pattern = "HiC",x = TASH_PI_INTRA$chr),]
+
+TASH_PI_INTRA_chr1 <- TASH_PI_INTRA[TASH_PI_INTRA$chr == "chr1",]
+TASH_PI_INTRA_chr2 <- TASH_PI_INTRA[TASH_PI_INTRA$chr == "chr2",]
+TASH_PI_INTRA_chr3 <- TASH_PI_INTRA[TASH_PI_INTRA$chr == "chr3",]
+TASH_PI_INTRA_chr4 <- TASH_PI_INTRA[TASH_PI_INTRA$chr == "chr4",]
+
+TASH_PI_INTRA_chr1$row_number <- 1:nrow(TASH_PI_INTRA_chr1)
+TASH_PI_INTRA_chr1$mb <- TASH_PI_INTRA_chr1$row_number*50/1000
+
+TASH_PI_INTRA_chr2$row_number <- 1:nrow(TASH_PI_INTRA_chr2)
+TASH_PI_INTRA_chr2$mb <- TASH_PI_INTRA_chr2$row_number*50/1000
+
+TASH_PI_INTRA_chr3$row_number <- 1:nrow(TASH_PI_INTRA_chr3)
+TASH_PI_INTRA_chr3$mb <- TASH_PI_INTRA_chr3$row_number*50/1000
+
+TASH_PI_INTRA_chr4$row_number <- 1:nrow(TASH_PI_INTRA_chr4)
+TASH_PI_INTRA_chr4$mb <- TASH_PI_INTRA_chr4$row_number*50/1000
+
+TASH_PI_INTRA_1 <- rbind(TASH_PI_INTRA_chr1, TASH_PI_INTRA_chr2, TASH_PI_INTRA_chr3, TASH_PI_INTRA_chr4)
+TASH_PI_INTRA_1$chr <- gsub(pattern = "chr3", replacement = "chr31", x = TASH_PI_INTRA_1$chr)
+TASH_PI_INTRA_1$chr <- gsub(pattern = "chr1", replacement = "chr3", x = TASH_PI_INTRA_1$chr)
+TASH_PI_INTRA_1$chr <- gsub(pattern = "chr31", replacement = "chr1", x = TASH_PI_INTRA_1$chr)
+
+ggplot(TASH_PI_INTRA_1, aes(x = mb, y = pi, colour = chr)) +
+  geom_line()+
+  ylab("π")+
+  xlab("Mb")+
+  facet_grid(.~ chr, scale="free", space="free")+
+  scale_color_manual(name = "Chromosome", values=pvcolor)+
+  theme_classic()+
+  theme(
+    plot.title = element_text(color="Black", size=15, face="bold"),
+    axis.title.x = element_text(color="Black", size=10, face="bold"),
+    axis.title.y = element_text(color="Black", size=10, face="bold"),
+    axis.text.x=element_text(size=rel(1)),
+    axis.text.y=element_text(size=rel(1)),
+    legend.position = "none",
+    #legend.text=element_text(size=10),
+    strip.background=element_blank(),
+    strip.text.y  = element_text(size=12, color="black",
+                                 face="bold")
+  )+
+  scale_x_continuous(breaks = seq(0, 39, 10))+
+  scale_y_continuous(breaks = seq(0, 1, 0.0025), lim=c(0,0.016))
+
+ggsave("plots/fig_1e_Intrapopulation_pi_tashan_nabai_profile_along_genome_50kbp_pv11_5.0.svg")
+
+TukeyHSD(aov(pi ~ chr, data=TASH_PI_INTRA_1))
+
+```
+
+
+# Figure 2
+## Figure 2a
+These plots are ordered based on the phylogenomic tree produced from OrthoFinder clustering, and was merged with the tree itself in Illustrator.
+
+```{r, warning=FALSE, message=FALSE}
+# read data
+data<-read.delim("data/fig_2a_get_all_filtered1214.out", header=T)
+
+# filter scaffolds
+#data<-data[data$Total>100,]
+
+# add factors
+data$Query<-factor(data$Query, levels=c("Pv", "Aa","Ag", "Dm"))
+data$Chromosome<-factor(data$Chromosome, levels=c("X", "Y", "2L", "2R", "3L", "3R", "1", "2", "3", "4", "UNKN"))
+data$Subject<-factor(data$Subject, levels=rev(c("ACEPH","AMELL","CSONO","PNUBI","PVAND","PPEMB","BANTA","CMARI","AAEGYL","CQUINQ","CQUIN","AATRO","ASINEC","ADIRU","AFARA","AEPIR","ACHRI","AMERU","AMELA","AARAB","ACOLU","ACOLUN","AGAMB","AQUAD","AMINI","ACULI","AFUNE","ASTEPI","ASTEP","AALBI","ADARL","DWILL","DPSEU","DPERS","DANAN","DMELA","DSECH","DSIMU","DEREC","DYAKU","DVIRI","DMOJA","DGRIM","LCUPR","MDOME","SCALC","GBREV","GPALP","GAUST","GPALL","GMORS")))
+
+# plot
+ggplot(data, aes(x=Chromosome, y=Subject, fill=Ratio)) + theme_classic() + geom_tile(color="black") + facet_grid(.~Query, space="free", scale="free") + scale_fill_gradient2(low="white", high="red", lim=c(0,1)) + theme(strip.background=element_blank(), axis.text.x=element_text(angle=90, vjust=0.5, hjust=1), legend.position="bottom")
+
+ggsave("plots/fig_2a_ortholog_heatmap.svg")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_2a_get_longest_of_singleCopyOrthologs_from_pep_file.pl.gcratio.out", header=F)
+data$V1<-factor(data$V1, levels=rev(c("ACEPH","AMELL","CSONO","PNUBI","PVAND","PPEMB","BANTA","CMARI","AAEGYL","CQUINQ","CQUIN","AATRO","ASINEC","ADIRU","AFARA","AEPIR","ACHRI","AMERU","AMELA","AARAB","ACOLU","ACOLUN","AGAMB","AQUAD","AMINI","ACULI","AFUNE","ASTEPI","ASTEP","AALBI","ADARL","DWILL","DPSEU","DPERS","DANAN","DMELA","DSECH","DSIMU","DEREC","DYAKU","DVIRI","DMOJA","DGRIM","LCUPR","MDOME","SCALC","GBREV","GPALP","GAUST","GPALL","GMORS")))
+
+ggplot() + geom_boxplot(data=data[data$V2=="SCO",] , aes(x=V5, y=V1), outlier.size=0.1) + geom_point(data=data[data$V2=="Genome",], aes(x=V5, y=V1), color="red", shape=8)  + theme_bw() + xlab("GC ratio") + ylab("Species")
+
+ggsave("plots/fig_2a_get_longest_of_singleCopyOrthologs_from_pep_file.pl.gcratio.out.svg")
+```
+
+# Figure 3
+## Figure 3a
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_3a_calculate_polypedilum_specific_ALLchr.pl.out")
+
+ggplot(data, aes(x=Start/1000000, color=Category)) + facet_grid(.~Chromosome, scale="free", space="free") + stat_bin(data=subset(data, Category=="Pv"),aes(y=cumsum(..count..)/sum(..count..)),geom="step")  + stat_bin(data=subset(data, Category=="Polypedilum"),aes(y=cumsum(..count..)/sum(..count..)), geom="step")   + stat_bin(data=subset(data, Category=="Conserved"),aes(y=cumsum(..count..)/sum(..count..)), geom="step") + theme_bw()+ theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5), panel.spacing=unit(0, "lines"), strip.background=element_blank(), panel.grid = element_blank(), legend.position="bottom") + scale_x_continuous(expand=c(0,0)) + scale_y_continuous(expand=c(0,0))  +xlab("Position in genome (Mb)") + ylab("Cummulative ratio of gene category") + scale_color_npg()
+
+ggsave("plots/fig_3a_calculate_polypedilum_specific_ALLchr.pl.out.svg")
+```
+
+
+## Figure 3b
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_3b_calculate_polypedilum_specific_chr4genes.pl.out.Polypedilum.txt.list.EnrichedGO_BiologicalProcess.tsv", header=T)
+data$Term<-factor(data$Term, levels=rev(data[order(data$Pvalue),]$Term))
+ggplot(data, aes(x=-log2(Pvalue), y=Term)) + geom_bar(stat="identity", fill="white", color="black") + theme_classic()   + geom_vline(xintercept=-log(0.05), color="red", alpha=0.4)
+ggsave("plots/fig_3b_calculate_polypedilum_specific_chr4genes.pl.out.Polypedilum.txt.list.EnrichedGO_BiologicalProcess.svg")
+```
+
+
+ 
+## Figure 3c
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_3c_OG0000376.all_paris.parsed.mcl.PVAND-PPEMB", header=F)
+
+ggplot(data) + geom_histogram(data=data[data$V3=="PVAND",], aes(x=V5, fill=V3),color="black")+ geom_histogram(data=data[data$V3=="PPEMB",], aes(x=V5, fill=V3),color="black") + theme_classic()  + facet_grid(V2~.) + theme(strip.background=element_blank(), legend.position="bottom") + xlab("dN/dS") + ylab("Count")  + scale_fill_aaas()
+
+ggsave("plots/fig_3c_OG0000376.all_paris.parsed.mcl.PVAND-PPEMB.svg")
+```
+
+
+
+
+## Figure 3d
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_3d_ARId1_orientation.txt", header=T)
+data$gene<-factor(data$gene, levels=data$gene[order(data$start)])
+ggplot(data, aes(xmin = start, xmax = end, y = molecule, fill = Category, forward = direction)) +   theme_genes() +  geom_gene_arrow() + geom_text(aes(x=(start+end)/2, label=gene), size=3, nudge_y=-0.3, angle=90) +  scale_x_continuous(expand=c(0.01,0.01)) + theme(legend.position="bottom", strip.text.y=element_text(angle=0)) + scale_fill_manual(values=c("white", "red", "green")) + xlab("Position (ARId1)") + ylab("")
+
+ggsave("plots/fig_3d_ARId1_orientation.svg")
+```
+
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_3d_ARId1.transcript.list.deg.list.fixed", header=F)
+pos <-read.delim("data/fig_3d_ARId1_orientation.txt")
+
+a<-merge(data, pos, by.x="V1", by.y="gene")
+a$V1<-factor(a$V1, levels=unique(a$V1[ order(a$start)]))
+a2<-data.frame(a, Cond=paste(a$V5, a$V6, sep="_"))
+a2$Cond<-factor(a2$Cond, levels=rev(c("Heat42C_1", "Heat42C_24", "ROS_1", "ROS_24", "Mannitol_3", "Mannitol_24", "NaCl_1", "NaCl_3", "NaCl_24","Trehalose_1", "Trehalose_3", "Trehalose_24", "PreCondTre_12", "PreCondTre_24", "PreCondTre_36", "PreCondTre_48", "Rehydration_0", "Rehydration_3", "Rehydration_12", "Rehydration_24", "Rehydration_72")))
+ggplot(a2, aes(x=V2, y=Cond, fill=V9)) + theme_bw() + geom_tile(color="black") + facet_grid(.~V1, space="free", scale="free") + theme(strip.background=element_blank(), panel.spacing=unit(0, "lines"), axis.text.x=element_blank(), axis.ticks.x=element_blank(), panel.grid=element_blank(), strip.text.x=element_text(angle=90, hjust=1, vjust=0.5), legend.position="top", panel.border=element_rect(color="gray")) + scale_fill_aaas() + xlab("") + ylab("Condition")
+ggsave("plots/fig_3d_ARId1.transcript.list.deg.list.heatmap.svg")
+
+```
+
+
+## Figure 3e
+```{r, warning=FALSE, message=FALSE}
+data<-read.delim("data/fig_3e_calculate_pI_vaules_for_LEA-LIL.pl.out", header=F)
+a<-data[data$V3 != "Lea-Island-Located protein",]
+ggplot(a, aes(x=V1, y=V4, colp=V1)) + geom_boxplot()  + theme_classic()  + xlab("ARId1 group") + ylab("Isoelectric point (pI)") + scale_y_continuous(lim=c(0,14), breaks=seq(0,14,2))
+ggsave("plots/fig_3e_calculate_pI_vaules_for_LEA-LIL.pl.out.svg", width=3, height=3)
+
+TukeyHSD(aov(V4~V1, data=a))
+```
+
+
+

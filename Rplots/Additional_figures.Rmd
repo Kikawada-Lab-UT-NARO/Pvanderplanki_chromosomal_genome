@@ -1,0 +1,699 @@
+---
+title: "Additional figures for Yoshida et al. 2022"
+author: Yuki Yoshida
+date: Dec 22, 2021
+output:
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+- This notebooks to reproduce the figures that we have created for the manuscript "High quality assembly of anhydrobiotic midge genome provides insights on a single chromosome-based emerging of extreme desiccation tolerance".
+- Figures were mainly created with R and were collated with Adobe Illustrator.
+- In several figures, the chromosome names and not-required headers are modified, however the plots are not modified in any way.
+- The aspect ratio/size of the figures may differ from the published plots.
+- Several notifications from R may be in Japanese.
+
+# Requirements
+```{r, error=FALSE, warning=FALSE}
+library(cowplot)
+library(fields)
+library(plyr)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(ggsci)
+library(ggalluvial)
+library(ggpubr)
+library(ggfortify)
+library(scales)
+library(stringr)
+library(tidyr)
+
+pvcolor = c("#1D71A9", "#EF7C21", "#359939", "#CA2828")
+```
+
+
+# Figure S1 (General features of the whole genome)
+## Fig S1C
+```{r, error=FALSE, warning=FALSE}
+data <- read.delim("data/fig_s1c_circos_rawdata.txt", header=F)
+
+# Change chr_1 <-> chr_3, this data was based on Pv5.0, change to Pv5.2 version data
+data[data$V3=="chr_1",]$V3<-"chr_xxx"
+data[data$V3=="chr_3",]$V3<-"chr_1"
+data[data$V3=="chr_xxx",]$V3<-"chr_3"
+data<-data[grep("chr", data$V3),]
+data$V3<-factor(data$V3, levels=c("chr_1", "chr_2", "chr_3", "chr_4"))
+
+data2<-data[-grep("ATratio", data$V2),]
+data2a<-data2[data2$V1=="DNA_Seq",]
+ggplot(data2a, aes(x=V3, y=V6, group=V3, fill=V3) ) + geom_boxplot(outlier.size=0.1) +  facet_grid(.~V2, scale="free", space="free_x") +  scale_fill_manual(values=pvcolor) + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position="none", strip.background=element_blank(), panel.spacing=unit(1, "lines"))  + scale_y_continuous(trans="log1p", lim=c(1,NA), breaks=c(10,100,1000,10000), expand=c(0,0), labels = function(x) format(x, scientific = TRUE)) + ylab("Average coverage for bin") + xlab("")
+ggsave("plots/fig_s1c_circos_rawdata.coverage.dna.svg")
+
+```
+
+
+## Fig S1D
+```{r, error=FALSE, warning=FALSE}
+data <- read.delim("data/fig_s1c_circos_rawdata.txt", header=F)
+data2b<-data2[data2$V1=="RNA_Seq",]
+
+ggplot(data2b, aes(x=V3, y=V6, group=V3, fill=V3) ) + geom_boxplot(outlier.size=0.1) +  facet_grid(.~V2, scale="free", space="free_x") +  scale_fill_manual(values=pvcolor) + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position="none", strip.background=element_blank(), panel.spacing=unit(1, "lines"))  + scale_y_continuous(trans="log1p", lim=c(0,NA), breaks=c(1,10,100,1000,10000), labels = function(x) format(x, scientific = TRUE)) + ylab("Average coverage for bin") + xlab("")
+ggsave("plots/fig_s1d_circos_rawdata.coverage.rna.svg", width=6.35, height=3.46)
+```
+
+## Fig S1E
+```{r}
+genes <- read.delim("data/fig_s1e_circos.geneCount.tsv", header=F)
+genes <- genes[grep("chr", genes$V1),]
+ggplot(genes, aes(x=V2/1000000, y=V4, color=V1)) + geom_line() + facet_grid(.~V1, scale="free", space="free") + theme_classic() + xlab("Position (Mbp)") + ylab("Count") + theme(strip.background=element_blank(), legend.position="bottom") + scale_color_manual(values=pvcolor)
+ggsave("plots/fig_s1e_genecount.svg")
+```
+
+## Fig S1f
+```{r}
+genes <- read.delim("data/fig_s1f_circos.nongeneCount.tsv", header=F)
+genes <- genes[grep("chr", genes$V1),]
+ggplot(genes, aes(x=V2/1000000, y=V4, color=V1)) + geom_line() + facet_grid(.~V1, scale="free", space="free") + theme_classic() + xlab("Position (Mbp)") + ylab("Count") + theme(strip.background=element_blank(), legend.position="bottom") + scale_color_manual(values=pvcolor)
+ggsave("plots/fig_s1f_nongenecount.svg")
+```
+
+# Figure S2 (Comparison of Pv0.9p and Pv5.2)
+## Fig S2b
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s2b_GC_ratio_pv11_insect_merged", header=T)
+ggplot(data, aes(x=X1_usercol, y=X5_pct_gc, fill=X1_usercol)) + geom_boxplot() + facet_grid(.~Assembly) + scale_fill_manual(values=pvcolor) + theme_classic() + theme(strip.background=element_blank() , legend.position="none") + xlab("Chromosome") + ylab("GC ratio")
+
+ggsave("plots/fig_s2b_GC_ratio_pv11_insect_merged.svg")
+
+TukeyHSD(aov(X5_pct_gc~X1_usercol, data=data))
+```
+
+
+# Figure S3 (Analysis of CTR-Seq data)
+## Figure S3A
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s3a_category.txt", header=T)
+
+tts<-data[data$Origin=="TTS",] %>% arrange(desc(Count)) %>% mutate(ypos = cumsum(Count) - Count / 2)  %>% mutate(per = Count / sum(Count))
+tss<-data[data$Origin=="TSS",] %>% arrange(desc(Count)) %>% mutate(ypos = cumsum(Count) - Count / 2)  %>% mutate(per = Count / sum(Count))
+
+ggplot(data=rbind(tss, tts), aes(x=0, y=per, fill=factor(Category))) + geom_col(color="black") + coord_polar("y") + facet_grid(.~Origin) + theme_void() + scale_fill_npg() +guides( fill=guide_legend(title="Category"))
+
+ggsave("plots/fig_s3a_category.svg")
+```
+
+## Figure S3B
+
+```{r, error=FALSE, warning=FALSE}
+input = "data/fig_s3b_kallisto.txt"
+data<-read.delim(input, header=T, row.names=1)
+y<-data[apply(data,1,mean)>0,]
+
+clust_count <- 8
+
+hr <- hclust(as.dist(1-cor(t(y), method="spearman")), method="ward.D")
+groups <- cutree(hr, k=clust_count)
+
+mydata<-t(scale(t(y)))
+a<-data.frame(rownames(y)[hr$order], mydata[hr$order,], groups[hr$order])
+colnames(a)[c(1,ncol(a))]<-c("Gene", "Group")
+a.melt<-melt(a, id.var=c("Gene", "Group"))
+
+a.melt2<-data.frame(a.melt[,c(1:3)], str_split_fixed(a.melt$variable, "\\_", 3),a.melt$value)
+colnames(a.melt2)<-c("Gene", "Group", "Full", "Origin", "Cond", "Repli", "Zval")
+a.melt2$Group<-factor(a.melt2$Group, levels=rev(unique(groups[hr$order])))
+
+a.melt2$Full<-factor(a.melt2$Full, levels=c("Larvae_wet_1", "Larvae_wet_2", "Larvae_D24_1", "Larvae_D24_2", "Larvae_D48_1", "Pv11_T0_1", "Pv11_T48_1"))
+a.melt2$Cond <- factor(a.melt2$Cond, levels=c("wet", "D24", "D48", "T0", "T48"))
+
+ggplot(a.melt2, aes(x=Full, y=Gene, fill=Zval)) + theme_bw() + geom_tile() + theme(strip.background=element_rect(fill="white", color="white"),  axis.ticks=element_blank(), axis.text.y=element_blank(), panel.spacing=unit(0, "lines"), panel.background=element_blank()) + facet_grid(Group~Cond, scales="free", space="free")  + scale_fill_gradient2(low = "blue", mid = "white", high = "red", lim=c(-4,4)) + xlab("Time Point") + scale_x_discrete(expand=c(0,0)) + ylab("mRNA")
+
+ggsave("plots/fig_s3b_kallisto.txt.svg", width=5, height=2)
+```
+
+
+
+```{r, error=FALSE, warning=FALSE}
+input = "data/fig_s3b_mergePeaks_d50_cage.peaks.UMI.cut.tsv"
+data<-read.delim(input, header=T, row.names=1)
+y<-data[apply(data,1,mean)>0,]
+
+clust_count <- 8
+
+hr <- hclust(as.dist(1-cor(t(y), method="spearman")), method="ward.D")
+groups <- cutree(hr, k=clust_count)
+
+mydata<-t(scale(t(y)))
+a<-data.frame(rownames(y)[hr$order], mydata[hr$order,], groups[hr$order])
+colnames(a)[c(1,ncol(a))]<-c("Gene", "Group")
+a.melt<-melt(a, id.var=c("Gene", "Group"))
+
+a.melt2<-data.frame(a.melt[,c(1:3)], str_split_fixed(a.melt$variable, "\\_", 3),a.melt$value)
+colnames(a.melt2)<-c("Gene", "Group", "Full", "Origin", "Cond", "Repli", "Zval")
+a.melt2$Group<-factor(a.melt2$Group, levels=rev(unique(groups[hr$order])))
+
+a.melt2$Full<-factor(a.melt2$Full, levels=c("Larvae_wet_1", "Larvae_wet_2", "Larvae_D24_1", "Larvae_D24_2", "Larvae_D48_1", "Pv11_T0_1", "Pv11_T48_1"))
+a.melt2$Cond <- factor(a.melt2$Cond, levels=c("wet", "D24", "D48", "T0", "T48"))
+
+ggplot(a.melt2, aes(x=Full, y=Gene, fill=Zval)) + theme_bw() + geom_tile() + theme(strip.background=element_rect(fill="white", color="white"),  axis.ticks=element_blank(), axis.text.y=element_blank(), panel.spacing=unit(0, "lines"), panel.background=element_blank()) + facet_grid(Group~Cond, scales="free", space="free")  + scale_fill_gradient2(low = "blue", mid = "white", high = "red", lim=c(-4,4)) + xlab("Time Point") + scale_x_discrete(expand=c(0,0)) + ylab("TSS")
+
+ggsave("plots/fig_s3b_mergePeaks_d50_cage.peaks.UMI.cut.tsv.svg", width=5, height=2)
+```
+
+```{r, error=FALSE, warning=FALSE}
+input = "data/fig_s3b_mergePeaks_d50_sage.peaks.UMI.cut.tsv"
+data<-read.delim(input, header=T, row.names=1)
+y<-data[apply(data,1,mean)>0,]
+
+summary(y)
+
+clust_count <- 8
+
+hr <- hclust(as.dist(1-cor(t(y), method="spearman")), method="ward.D")
+groups <- cutree(hr, k=clust_count)
+
+mydata<-t(scale(t(y)))
+a<-data.frame(rownames(y)[hr$order], mydata[hr$order,], groups[hr$order])
+colnames(a)[c(1,ncol(a))]<-c("Gene", "Group")
+a.melt<-reshape2::melt(a, id.var=c("Gene", "Group"))
+
+a.melt2<-data.frame(a.melt[,c(1:3)], str_split_fixed(a.melt$variable, "\\_", 3),a.melt$value)
+colnames(a.melt2)<-c("Gene", "Group", "Full", "Origin", "Cond", "Repli", "Zval")
+a.melt2$Group<-factor(a.melt2$Group, levels=rev(unique(groups[hr$order])))
+
+a.melt2$Full<-factor(a.melt2$Full, levels=c("Larvae_wet_1", "Larvae_wet_2", "Larvae_D24_1", "Larvae_D24_2", "Larvae_D48_1", "Pv11_T0_1", "Pv11_T48_1"))
+a.melt2$Cond <- factor(a.melt2$Cond, levels=c("wet", "D24", "D48", "T0", "T48"))
+
+ggplot(a.melt2, aes(x=Full, y=Gene, fill=Zval)) + theme_bw() + geom_tile() + theme(strip.background=element_rect(fill="white", color="white"),  axis.ticks=element_blank(), axis.text.y=element_blank(), panel.spacing=unit(0, "lines"), panel.background=element_blank()) + facet_grid(Group~Cond, scales="free", space="free")  + scale_fill_gradient2(low = "blue", mid = "white", high = "red", lim=c(-4,4)) + xlab("Time Point") + scale_x_discrete(expand=c(0,0)) + ylab("TTS")
+
+ggsave("plots/fig_s3b_mergePeaks_d50_sage.peaks.UMI.cut.tsv.svg", width=5, height=2)
+```
+
+
+
+## Figure S3C
+```{r, error=FALSE, warning=FALSE}
+## TSS
+data<-read.delim("data/fig_s3c_motif_enrichment_cage_EboxInrTATA.out", header=T)
+a<-data[,c(1,3,4,6,7,9,10)]
+a.melt<-reshape2::melt(a, id.var="Distance_from_Center")
+a2<-data.frame(a.melt, str_split_fixed(a.melt$variable, "\\_", 3))
+colnames(a2) <- c("Distance_from_Center", "full", "Frequency", "Motif", "strand", "sites")
+a2$strand<-factor(a2$strand, levels=c("p", "n"))
+
+ggplot(a2[a2$Motif != "E.box",], aes(x=Distance_from_Center, y=Frequency, color=strand)) + geom_vline(xintercept=0, color="gray") + geom_line() + facet_grid(Motif~., scale="free_y") + scale_x_continuous(lim=c(-100,100)) + theme_classic() + theme(strip.background=element_blank(), legend.position="none") + scale_color_npg() + xlab("Distance from TSS site (bp)")
+
+ggsave("plots/fig_s3c_motif_enrichment_cage_EboxInrTATA.out.svg", width=4,height=2)
+
+```
+
+## Figure S3D
+```{r, error=FALSE, warning=FALSE}
+## TTS
+data<-read.delim("data/fig_s3d_motif_enrichment_sage_motif1-7.out", header=T)
+a<-data[,c(1,3,4,9,10,6,7)]
+a.melt<-reshape2::melt(a, id.var="Distance_from_Center")
+a2<-data.frame(a.melt, str_split_fixed(a.melt$variable, "\\_", 3))
+colnames(a2) <- c("Distance_from_Center", "full", "Frequency", "Motif", "strand", "sites")
+a2$strand<-factor(a2$strand, levels=c("p", "n"))
+ggplot(a2, aes(x=Distance_from_Center*-1, y=Frequency, color=strand)) + geom_vline(xintercept=0, color="gray") + geom_line() + facet_grid(Motif~., scale="free_y") + scale_x_continuous(lim=c(-100,100)) + theme_classic() + theme(strip.background=element_blank(), legend.position="none") + scale_color_npg() + xlab("Distance from TTS site (bp)")
+ggsave("plots/fig_s3d_motif_enrichment_sage_motif1-7.out.svg", width=4,height=3)
+```
+
+
+
+# Figure S4 (Comparison using Populations and Cell lines)
+
+## Fig S4a
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s4a_dp_count.txt", header=F)
+ggplot(data, aes(x=V2, y=V3, group=V1, color=V1)) + geom_line() + scale_x_continuous(lim=c(9,50)) + theme_classic() + theme(legend.position="bottom") + xlab("Read coverage (DP) of SNV position")  + ylab("Count")
+ggsave("plots/fig_s4a_dp_count.svg", width=7, height=2.5)
+
+```
+
+## Fig S4b
+
+```{r, error=FALSE, warning=FALSE}
+fst_t_p = fread("data/fig_s4b_TASH_PAN_Pv11_5.0_WD_mcf0_min_cov_9.fst")
+
+fst_t_p <- separate(data = fst_t_p, col = V6, into = c("V7", "V8"), sep = "=")
+fst_t_p$V8 <- as.numeric(as.character(fst_t_p$V8))
+fst_t_p <- cbind("window number" = 1:nrow(fst_t_p), fst_t_p)
+
+fst_t_p$mb <- fst_t_p$V2/1000000
+fst_t_p$V1 <- gsub(pattern ="_", replacement = "", x = fst_t_p$V1)
+
+fst_t_p <- fst_t_p[!grepl(pattern = "HiC", x = fst_t_p$V1),]
+
+fst_t_g = fread("data/fig_s4b_TASH_JERE_Pv11_5.0_WD_mcf0_min_cov_9.fst")
+
+fst_t_g <- separate(data = fst_t_g, col = V6, into = c("V7", "V8"), sep = "=")
+fst_t_g$V8 <- as.numeric(as.character(fst_t_g$V8))
+fst_t_g <- cbind("window number" = 1:nrow(fst_t_g), fst_t_g)
+fst_t_g$mb <- fst_t_g$V2/1000000
+fst_t_g$V1 <- gsub(pattern ="_", replacement = "", x = fst_t_g$V1)
+
+fst_t_g <- fst_t_g[!grepl(pattern = "HiC", x = fst_t_g$V1),]
+
+fst_t_g6 = fread("data/fig_s4b_TASH_GISHIRI_Pv11_5.0_WD_mcf0_min_cov_9.fst")
+
+
+fst_t_g6 <- separate(data = fst_t_g6, col = V6, into = c("V7", "V8"), sep = "=")
+fst_t_g6$V8 <- as.numeric(as.character(fst_t_g6$V8))
+fst_t_g6 <- cbind("window number" = 1:nrow(fst_t_g6), fst_t_g6)
+fst_t_g6$mb <- fst_t_g6$V2/1000000
+fst_t_g6$V1 <- gsub(pattern ="_", replacement = "", x = fst_t_g6$V1)
+fst_t_g6 <- fst_t_g6[!grepl(pattern = "scaffold", x = fst_t_g6$V1),]
+
+fst_t_w7 = fread("data/fig_s4b_TASH_WAK_Pv11_5.0_WD_mcf0_min_cov_9.fst")
+
+
+fst_t_w7 <- separate(data = fst_t_w7, col = V6, into = c("V7", "V8"), sep = "=")
+fst_t_w7$V8 <- as.numeric(as.character(fst_t_w7$V8))
+fst_t_w7 <- cbind("window number" = 1:nrow(fst_t_w7), fst_t_w7)
+fst_t_w7$mb <- fst_t_w7$V2/1000000
+fst_t_w7$V1 <- gsub(pattern ="_", replacement = "", x = fst_t_w7$V1)
+fst_t_w7 <- fst_t_w7[!grepl(pattern = "scaffold", x = fst_t_w7$V1),]
+
+fst_t_a9 = fread("data/fig_s4b_TASH_Anguantuta_Pv11_5.0_WD_mcf0_min_cov_9.fst")
+
+fst_t_a9 <- separate(data = fst_t_a9, col = V6, into = c("V7", "V8"), sep = "=")
+fst_t_a9$V8 <- as.numeric(as.character(fst_t_a9$V8))
+fst_t_a9 <- cbind("window number" = 1:nrow(fst_t_a9), fst_t_a9)
+fst_t_a9$mb <- fst_t_a9$V2/1000000
+fst_t_a9$V1 <- gsub(pattern ="_", replacement = "", x = fst_t_a9$V1)
+fst_t_a9 <- fst_t_a9[!grepl(pattern = "scaffold", x = fst_t_a9$V1),]
+
+
+FST_ALL_POPS = list(fst_t_p, fst_t_g, fst_t_g6, fst_t_w7, fst_t_a9)
+FST_ALL_POPS <- lapply(FST_ALL_POPS, as.data.frame)
+names(FST_ALL_POPS) = c("Tashan nabai vs. Panbalarabe", "Tashan nabai vs. Jere", "Tashan nabai vs. Gishiri", "Tashan nabai vs. Wak", "Tashan nabai vs. Anguantuta")
+FST <- bind_rows(FST_ALL_POPS, .id = "populations")
+colnames(FST)[2] <- "window_number"
+
+
+FST$V1 <- gsub(pattern = "chr3", replacement = "chr31", x = FST$V1)
+FST$V1 <- gsub(pattern = "chr1", replacement = "chr3", x = FST$V1)
+FST$V1 <- gsub(pattern = "chr31", replacement = "chr1", x = FST$V1)
+
+ggplot(FST, aes(x = mb, y= V8, color = populations)) +
+  geom_point(size=0.3)+
+  ylab("Fst")+
+  xlab("Position in genome (Mb)")+
+  facet_grid(.~V1, space="free", scale="free")+
+  scale_color_npg(name = "Populations")+
+  theme_classic()+
+  theme(
+    plot.title = element_text(color="Black", size=15, face="bold"),
+    axis.title.x = element_text(color="Black", size=10, face="bold"),
+    axis.title.y = element_text(color="Black", size=10, face="bold"),
+    axis.text.x=element_text(size=rel(1)),
+    axis.text.y=element_text(size=rel(1)),
+    legend.title=element_text(size=10),
+    legend.text=element_text(size=10),
+    strip.background=element_blank(),
+    strip.text.y  = element_text(size=12, color="black", face="bold"),
+    legend.position = "bottom"
+    
+  ) +
+  scale_x_continuous(breaks = seq(0, 39, 10)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2), lim=c(0,1)) +
+  guides(color=guide_legend(nrow=2,byrow=TRUE, title=""))
+
+ggsave("plots/fig_s4b_Fst_curve_tashan_nabai_vs_others_50kbp_along_genome_pv11_5.0_yukiVer.svg")
+```
+
+## Fig S4C
+```{r, error=FALSE, warning=FALSE}
+dat <- data.frame(chromosome = paste0("chr", 1:4), size = c(31432200, 35209050, 36877100, 14019800))
+
+bed_t <- read.table(file = "data/fig_s4c_TASHAN_NABAI_all_chr_sweeps_k0001.bed")
+
+bed_t <- bed_t[,c(1:3,5)]
+colnames(bed_t) <- c("chr", "start", "end", "value1")
+bed_t$pop <- "Tashan nabai"
+bed_t$pos <- 6
+
+bed_p <- read.table(file = "data/fig_s4c_PANBALARABE_all_chr_sweeps_k0001.bed")
+
+bed_p <- bed_p[,c(1:3,5)]
+colnames(bed_p) <- c("chr", "start", "end", "value1")
+bed_p$pop <- "Panbalarabe"
+bed_p$pos <- 5
+
+bed_j <- read.table(file = "data/fig_s4c_JERE_all_chr_sweeps_k0001.bed")
+
+bed_j <- bed_j[,c(1:3,5)]
+colnames(bed_j) <- c("chr", "start", "end", "value1")
+bed_j$pop <- "Jere"
+bed_j$pos <- 3
+
+bed_g <- read.table(file = "data/fig_s4c_GISHIRI_all_chr_sweeps_k0001.bed")
+
+bed_g <- bed_g[,c(1:3,5)]
+colnames(bed_g) <- c("chr", "start", "end", "value1")
+bed_g$pop <- "Gishiri"
+bed_g$pos <- 2
+
+bed_w <- read.table(file = "data/fig_s4c_WAK_all_chr_sweeps_k0001.bed")
+
+bed_w <- bed_w[,c(1:3,5)]
+colnames(bed_w) <- c("chr", "start", "end", "value1")
+bed_w$pop <- "Wak"
+bed_w$pos <- 4
+
+
+bed_a <- read.table(file = "data/fig_s4c_ANGUANTUTA_all_chr_sweeps_k0001.bed")
+
+bed_a <- bed_a[,c(1:3,5)]
+colnames(bed_a) <- c("chr", "start", "end", "value1")
+bed_a$pop <- "Anguantuta"
+bed_a$pos <- 1
+
+bed_pops <- rbind(bed_t, bed_p, bed_w, bed_j, bed_g, bed_a)
+bed_pops$chr <- gsub(pattern = "_", replacement = "", x = bed_pops$chr)
+
+bed_pops <- merge(x = bed_pops, y = dat, by.x = "chr", by.y = "chromosome")
+
+
+bed_pops$mb <- bed_pops$size/1000000
+bed_pops$mb_start <- bed_pops$start/1000000
+bed_pops$mb_end <- bed_pops$end/1000000
+
+## The chromosome numbers have changed after this analysis.
+## Fixing the IDs to match Pv_5.2 
+bed_pops$chr <- gsub(pattern = "chr3", replacement = "chr31", x = bed_pops$chr)
+bed_pops$chr <- gsub(pattern = "chr1", replacement = "chr3", x = bed_pops$chr)
+bed_pops$chr <- gsub(pattern = "chr31", replacement = "chr1", x = bed_pops$chr)
+
+bed_pops$pop <- factor(bed_pops$pop, level = c("Tashan nabai", "Panbalarabe", "Wak", "Jere", "Gishiri","Anguantuta"))
+
+ggplot(data=bed_pops, aes(x = mb)) + geom_point(data=bed_pops, aes(x=(mb_start + mb_end)/2, y=pos, colour=pop), size=1) + scale_color_npg(name = "Populations")+  theme_bw()+ theme( plot.title = element_text(color="Black", size=15, face="bold"), axis.title.x = element_text(color="Black", size=10, face="bold"),axis.text.x=element_text(size=rel(1)), strip.background=element_blank(), strip.text.y  = element_text(size=12, color="black", face="bold"), axis.text.y=element_blank() , axis.ticks.y=element_blank(), legend.position="bottom") +guides(color=guide_legend(nrow=1,byrow=TRUE)) + xlab("Position in genome (Mb)") + ylab("") + facet_grid(.~chr, space="free", scale="free")
+
+ggsave("plots/fig_s4c_Selective_sweeps_along_genome_pv11.svg")
+```
+
+
+## Fig S4D
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s4d_PANBALARABE.snape-pooled.full.af.PREDICT.BSCORRECTED.txt" , header=T)
+
+ggplot(data, aes(x=start/1000000, y=recombRate, group=chrom, color=chrom)) +
+  geom_point(size=0.1) + facet_grid(.~chrom, space="free", scale="free") +
+  stat_summary_bin(fun = "mean", binwidth=0.5, size=0.3, color="black", geom="line")  +
+  stat_summary_bin(fun.data = mean_ci, binwidth=0.5, size=0.3, color="gray", alpha=0.3, geom="ribbon")  +
+  theme_classic() + theme(strip.background=element_blank(), strip.text=element_blank(), legend.position="none") +
+  xlab("Position (Mbp)") +
+  ylab("Per base recombination rate") +
+  scale_color_manual(values=pvcolor)
+
+ggsave("plots/fig_s4d_PANBALARABE.snape-pooled.full.af.PREDICT.BSCORRECTED.txt.svg", width=6.35, height=3.46)
+
+TukeyHSD(aov(recombRate~chrom, data=data))
+
+```
+
+## Fig S4E
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s4e_tstv.txt", header=F)
+colnames(data)<-c("Library", "Chromosome", "ts.tv")
+ggplot(data, aes(x=Chromosome, y=ts.tv, fill=as.factor(Chromosome), group=as.factor(Chromosome)) ) + geom_boxplot() + scale_fill_manual(values=pvcolor) + theme_classic() + theme(legend.position="none") + xlab("Chromosome") + ylab("Ts/Tv ratio")
+ggsave("plots/fig_s4e_tstv.txt.svg")
+
+TukeyHSD(aov(ts.tv~ as.factor(Chromosome), data))
+```
+
+
+
+
+# Figure S5 (Genomic synteny with other Diptera)
+## Fig S5a
+```{r, error=FALSE, warning=FALSE}
+######################################
+##### ortholog heatmap
+######################################
+# read data
+data<-read.delim("data/fig_s5a_get_pv_orthologs_by_chr.pl.out", header=T)
+# filter scaffolds
+data<-data[data$Total>100,]
+# add factors
+data$Query<-factor(data$Query, levels=c("Pv", "Aa","Ag", "Dm"))
+data$Chromosome<-factor(data$Chromosome, levels=c("X", "2L", "2R", "3L", "3R", "1", "2", "3", "4", "UNKN"))
+data$Subject<-factor(data$Subject, levels=rev(c("PODON","PSTEI","TNEMO","PTONN","TPECI","OACUT","CDRAY","CMARI","CARDI","BANTA","KINVE","PARAB","CRIPA","CCOLU","CTENT","CDILU","PNUBI","PTAMA","PVAND","PPEMB","CSONO","AAEGYL","AGAMB")));
+# plot
+ggplot(data, aes(x=Chromosome, y=Subject, fill=Ratio)) + theme_classic() + geom_tile(color="black") +geom_text(aes(label=round(Ratio, digits=2))) + facet_grid(.~Query, space="free", scale="free") + scale_fill_gradient2(low="white", high="red", lim=c(0,1)) + theme(strip.background=element_blank(), axis.text.x=element_text(angle=90, vjust=0.5, hjust=1), legend.position="bottom")
+ggsave("plots/fig_s5a_get_pv_orthologs_by_chr_GenomesTranscriptomes.pl.out.svg")
+```
+
+
+
+## Fig S5b
+```{r, error=FALSE, warning=FALSE}
+### ab initio
+data<-read.delim("data/fig_s5b_get_orthologs_by_chr.ou", header=T)
+data$Query<-factor(data$Query, levels=c("Pv", "Aa","Ag", "Dm"))
+data$Subject<-factor(data$Subject, levels=rev(c("ACEPH","AMELL","CSONO","CRIPA", "CTENT", "PNUBI","PVAND","PPEMB","BANTA","CMARI","AAEGYL","CQUINQ","CQUIN","AATRO","ASINEC","ADIRU","AFARA","AEPIR","ACHRI","AMERU","AMELA","AARAB","ACOLU","ACOLUN","AGAMB","AQUAD","AMINI","ACULI","AFUNE","ASTEPI","ASTEP","AALBI","ADARL","DWILL","DPSEU","DPERS","DANAN","DMELA","DSECH","DSIMU","DEREC","DYAKU","DVIRI","DMOJA","DGRIM","LCUPR","MDOME","SCALC","GBREV","GPALP","GAUST","GPALL","GMORS")))
+data$Chromosome<-factor(data$Chromosome, levels=c("X", "Y", "1", "2", "3", "2L", "2R", "3L", "3R", "4"))
+ggplot(data, aes(x=Chromosome, y=Subject, fill=Ratio)) + theme_classic() + geom_tile(color="black") + facet_grid(.~Query, space="free", scale="free") + scale_fill_gradient2(low="white", high="red", lim=c(0,1), guide=guide_colorbar(frame.colour = "black")) + theme(strip.background=element_blank(), axis.text.x=element_text(), legend.position="bottom", axis.text.y=element_text(size=6) ) + scale_x_discrete(expand=c(0,0))
+
+ggsave("plots/fig_S5b_get_orthologs_by_chr.ou.svg", height=7, width=6.1)
+```
+
+## Figure 5G
+These subplots were produced seperately and was merged and color fixed in Illustrator.
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s5g_get_BBHorthologs_pv_aa.pl.count.out", header=F)
+data$V2<-factor(data$V2, levels=c("aa1", "aa2", "aa3"))
+ggplot(data, aes(y=V3, axis1=V2, axis2=V1)) + geom_alluvium(aes(fill=V2), color="gray", width=1/12, reverse=FALSE) + geom_stratum(width=1/12, fill="white", color="black", reverse=FALSE) + geom_text(stat="stratum", aes(label=after_stat(stratum)), reverse=FALSE) + scale_x_discrete(limits=c("Pv", "Dm")) + scale_fill_brewer(type="qual", palette="Set1")  + theme_void() + coord_flip()  + guides(fill=FALSE)
+ggsave("plots/fig_s5g_get_BBHorthologs_pv_aa.pl.count.out.svg")
+```
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s5g_get_BBHorthologs_pv_dm.pl.count.out", header=F)
+data$V2<-factor(data$V2, levels=c("X", "2L", "2R", "3L", "3R", "4", "Y"))
+ggplot(data, aes(y=V3, axis1=V1, axis2=V2)) + geom_alluvium(aes(fill=V2), color="gray", width=1/12, reverse=FALSE) + geom_stratum(width=1/12, fill="white", color="black", reverse=FALSE) + geom_text(stat="stratum", aes(label=after_stat(stratum)), reverse=FALSE) + scale_x_discrete(limits=c("Pv", "Dm")) + scale_fill_brewer(type="qual", palette="Set1")  + theme_void() + coord_flip()  + guides(fill=FALSE)
+ggsave("plots/fig_s5g_get_BBHorthologs_pv_dm.pl.count.out.svg")
+```
+
+## Fig S5H
+```{r, error=FALSE, warning=FALSE}
+dnds_s_s_pn_pv_pp_longest_isoform<- read.table("data/fig_s5h_dnds_paml_pn_pv_pp_s_s_ortho.txt")
+
+dnds_s_s_pn_pv_pp_longest_isoform <- dnds_s_s_pn_pv_pp_longest_isoform[(grepl(pattern = "Pp", x = dnds_s_s_pn_pv_pp_longest_isoform$V1) & grepl(pattern = "Pv", x = dnds_s_s_pn_pv_pp_longest_isoform$V2)) | (grepl(pattern = "Pv", x = dnds_s_s_pn_pv_pp_longest_isoform$V1) & grepl(pattern = "Pp", x = dnds_s_s_pn_pv_pp_longest_isoform$V2)),]
+
+dnds_s_s_pn_pv_pp_longest_isoform <- dnds_s_s_pn_pv_pp_longest_isoform[!duplicated(dnds_s_s_pn_pv_pp_longest_isoform$V1),]
+dnds_s_s_pn_pv_pp_longest_isoform <- dnds_s_s_pn_pv_pp_longest_isoform[!duplicated(dnds_s_s_pn_pv_pp_longest_isoform$V2),]
+
+colnames(dnds_s_s_pn_pv_pp_longest_isoform) <- c("Gene_1", "Gene_2", "dnds", "dn", "ds")
+
+annotation <- fread(file = "data/fig_s5h_Pv11_5.0_annotation.gtf")
+annotation <- annotation[annotation$V3 == "gene",]
+annotation <- annotation[!grepl(pattern = "HiC", x = annotation$V1),]
+
+annotation$V9 <- paste0("Pv.", annotation$V9, ".t1")
+annotation$V1 <- gsub(pattern = "_", replacement = "",x = annotation$V1)
+
+dnds_s_s_pn_pv_pp_longest_isoform_merged <- merge(x = annotation, y = dnds_s_s_pn_pv_pp_longest_isoform, by.x = "V9", by.y = "Gene_2")
+
+# This analysis was done with the Pv5.0 genome, change the chromsome names to fit Pv5.2
+dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered <- dnds_s_s_pn_pv_pp_longest_isoform_merged[dnds_s_s_pn_pv_pp_longest_isoform_merged$dnds < 1,]
+dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered$V1 <- gsub(pattern = "chr3", replacement = "chr31", x = dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered$V1)
+dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered$V1 <- gsub(pattern = "chr1", replacement = "chr3", x = dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered$V1)
+dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered$V1 <- gsub(pattern = "chr31", replacement = "chr1", x = dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered$V1)
+
+
+my_comparisons <- list( c("chr1", "chr2"), c("chr1", "chr3"), c("chr2", "chr3"),c("chr1", "chr4"), c("chr2", "chr4"), c("chr3", "chr4") )
+p <- ggplot(dnds_s_s_pn_pv_pp_longest_isoform_merged_filtered, aes(x=V1, y=dnds, fill = V1)) +
+  geom_boxplot()+
+  scale_y_continuous(breaks = seq(from = 0, to = 1.5, by = 0.1))+
+  xlab(label = "")+
+  ylab(label = "dN/dS")+
+  theme_bw()+
+  stat_compare_means(comparisons = my_comparisons, bracket.size = 0.1, label.y = c(1, 1.1, 1.2, 1.3, 1.4, 1.5))+ # Add pairwise comparisons p-value
+  stat_compare_means(label.y = 1.4, size = 2)+ # Add pairwise comparisons p-value
+   scale_fill_manual(name = "Chromosome", values=c("#3171A9", "#EB6100", "#389939", "#C9252A"))+
+  theme(
+    plot.title = element_text(color="Black", size=15, face="bold"),
+    axis.title.x = element_text(color="Black", size=5, face="bold"),
+    axis.title.y = element_text(color="Black", size=10, face="bold"),
+    axis.text.x=element_text(size=rel(1), face = "bold"),
+    axis.text.y=element_text(size=rel(1)),
+    legend.position = "none",
+    strip.background=element_blank(),
+    strip.text.y  = element_text(size=2, color="black",
+                                 face="bold")
+  )
+p$layers[[2]]$aes_params$textsize <- 2
+
+p
+ggsave("plots/fig_s5h_Distribution_of_dnds_of_single-to-single_orthologs_pv_pp.svg", width = 5, height = 2.5)
+
+```
+
+
+
+# Figure S6 (Transcriptome analysis)
+## Fig S6a
+
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s6a_RSEM.isoform.TPM.not_cross_norm", header=T, row.names=1)
+c<-prcomp(t(data))
+c2<-data.frame(str_split_fixed(row.names(c$x), "\\_", 4)[,-1])
+colnames(c2) <- c("Sample", "Time", "Rep")
+c2$Sample<-factor(c2$Sample, levels=c("Control", "Heat42C", "ROS", "NaCl","Mannitol", "Trehalose", "PreCondTre", "Rehydration"))
+
+autoplot(c, x=1, y=2, data=c2, colour='Sample', shape='Time', size=3) + scale_color_aaas(name="Condition") + scale_shape_manual(values=0:length(unique(c2$Time)), name="Time") + theme_bw()  + theme(panel.grid=element_blank(), legend.position="bottom")
+
+ggsave("plots/fig_s6a_prcomp_x1y2.svg", width=8, height=4)
+
+autoplot(c, x=1, y=3, data=c2, colour='Sample', shape='Time', size=3) + scale_color_aaas(name="Condition") + scale_shape_manual(values=0:length(unique(c2$Time)), name="Time") + theme_bw()  + theme(panel.grid=element_blank(), legend.position="bottom")
+
+ggsave("plots/fig_s6a_prcomp_x1y3.svg", width=8, height=4)
+
+```
+
+
+## Fig S6B
+The clustering run in this plot may require a lot of memory. I had no problem creating this plot in my 16Gb mac mini.
+### Read expression matrix
+```{r, error=FALSE, warning=FALSE}
+input ="data/fig_s6b_get_degs_from_both.pl.out.tpm"
+data<-read.delim(input, header=T, row.names=1)
+y<-data
+```
+
+### Calculate cluster count using wss (high-memory consuming)
+```{r, error=FALSE, warning=FALSE}
+y_hr <- y
+wss <- (nrow(y_hr)-1)*sum(apply(y_hr,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(y_hr, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+hr_clust_count <- 8
+hr <- hclust(as.dist(1-cor(t(y), method="spearman")), method="ward.D")
+groups_hr <- cutree(hr, k=hr_clust_count)
+```
+
+
+```{r, error=FALSE, warning=FALSE}
+## Calculate cluster count with
+y_hd <- t(y)
+wss <- (nrow(y_hd)-1)*sum(apply(y_hd,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(y_hd, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+hd_clust_count <- 8
+hd <- hclust(as.dist(1-cor(y, method="spearman")), method="ward.D")
+groups_hd <- cutree(hd, k=hd_clust_count)
+```
+
+### Reshape the data for ggplot
+```{r, error=FALSE, warning=FALSE}
+mydata<-t(scale(t(y)))
+a<-data.frame(rownames(y)[hr$order], mydata[hr$order,], groups_hr[hr$order])
+colnames(a)[c(1,ncol(a))]<-c("Gene", "Group_hr")
+a.melt<-melt(a, id.var=c("Gene", "Group_hr"))
+
+a.melt2<-data.frame(a.melt[,c(1:3)], str_split_fixed(a.melt$variable, "\\_", 4),a.melt$value)
+colnames(a.melt2)<-c("Gene", "Group_hr", "Full", "Origin", "Cond", "Time", "Repli", "Zvalue")
+
+a.melt2$Group_hr<-factor(a.melt2$Group_hr, levels=rev(unique(groups_hr[hr$order])))
+a.melt2$Gene<-factor(a.melt2$Gene, levels=rownames(y)[hr$order])
+a.melt2$Full<-factor(a.melt2$Full, levels=colnames(y)[hd$order])
+a.melt2$Cond<-factor(a.melt2$Cond, levels=c("Control", "Heat42C", "ROS", "Mannitol", "NaCl", "Trehalose", "PreCondTre", "Rehydration"))
+
+a.melt3<-data.frame(a.melt2, Group_hd=groups_hd[as.vector(a.melt2$Full)])
+a.melt3$Group_hd<-factor(a.melt3$Group_hd, levels=unique(groups_hd[hd$order]))
+write.table(a.melt3, "data/fig_s6b_get_degs_from_both.pl.out.tpm.hclust.tbl",quote=F,sep="\t", row.names=F )
+
+# Save the RDS for backup
+saveRDS(a.melt3, file="data/fig_s6b_get_degs_from_both.pl.out.tpm.rds")
+```
+
+### Reading in R save data from a previous run in case you don't want to run the whole clustering again
+```{r, error=FALSE, warning=FALSE}
+#a.melt3 <- readRDS("data/get_degs_from_both.pl.out.tpm.rds")
+```
+
+### Make the main heatmap plot
+```{r, error=FALSE, warning=FALSE}
+a.melt3.plot<-ggplot(a.melt3, aes(x=Full, y=Gene, fill=Zvalue)) + theme_bw() + geom_tile(aes(color=Zvalue)) + theme(strip.background=element_rect(fill="white", color="white"),  axis.ticks=element_blank(), axis.text.y=element_blank(), axis.text.x=element_text(angle=90, vjust=0.5, hjust=1), panel.spacing=unit(0, "lines"), legend.position="bottom") + facet_grid(Group_hr~Group_hd, scales="free", space="free")  + scale_fill_gradient2(low = "blue", mid = "white", high = "red", lim=c(-9,9), name="Z value") + scale_color_gradient2(low = "blue", mid = "white", high = "red", lim=c(-9,9), name="Z value") +  xlab("Condition / Time Point") + ylab("") + scale_x_discrete(expand=c(0,0)) + scale_y_discrete(expand=c(0,0))
+a.melt3.plot
+ggsave(a.melt3.plot, file="plots/fig_s6b_deg_heatmap.svg", width = 10.6, height= 10.06)
+```
+
+### Make the time color table
+```{r, error=FALSE, warning=FALSE}
+b<-unique(a.melt3[,c(3,5,6)])
+b.melt<-melt(b, id.var=c("Full"))
+
+b.melt.time<-ggplot(b.melt[b.melt$variable=="Time",], aes(x=Full, y=variable, fill=as.numeric(as.character(value))))+ geom_tile(color="black") + theme_void() + theme(axis.ticks=element_blank(), axis.text.y=element_blank(), axis.text.x=element_blank(), legend.position="bottom") + scale_fill_gradient(breaks=c(0,1,3,12,24,36,48,72), trans="log1p", name="Time") + guides(fill = guide_legend(nrow = 1)) + xlab("") + ylab("")
+b.melt.time
+ggsave(b.melt.time, file="plots/fig_s6b_deg_time.svg", width = 10.6, height= 0.5)
+
+```
+
+### Make the sample color table
+```{r, error=FALSE, warning=FALSE}
+b.melt.sample<-ggplot(b.melt[b.melt$variable=="Cond",], aes(x=Full, y=variable, fill=value))+ geom_tile(color="black") + theme_void() + theme(axis.ticks=element_blank(), axis.text.y=element_blank(), axis.text.x=element_blank(), legend.position="bottom") + scale_fill_manual(values=pal_aaas("default")(9), name="Condition") + guides(fill = guide_legend(nrow = 1)) + xlab("") + ylab("")
+b.melt.sample
+ggsave(b.melt.sample, file="plots/fig_s6b_deg_sample.svg", width = 10.6, height= 0.5)
+
+```
+
+```{r, error=FALSE, warning=FALSE}
+e<-read.delim("data/fig_s6b_get_degs_from_both.pl.out", header=F)
+
+e$V4<-factor(e$V4, levels=c("Control", "Heat42C", "ROS", "Mannitol", "NaCl", "Trehalose", "PreCondTre", "Rehydration"))
+e$V1<-factor(e$V1, levels=rownames(y)[hr$order])
+
+e.plot<-ggplot(e, aes(x=as.factor(V5), y=V1, fill=V4, alpha=V5) ) + geom_tile() + facet_grid(.~ V4, space="free", scale="free")+  theme(strip.background=element_rect(fill="white", color="white"), axis.ticks=element_blank(), panel.spacing=unit(0, "lines"), panel.border=element_rect(color="black", fill=NA, size=0.2), legend.position="bottom", axis.text.y=element_blank(), axis.text.x=element_blank())+ xlab("") + ylab("") + guides(fill=guide_legend(nrow=1)) + scale_fill_manual(values=pal_aaas("default")(8)[-1])
+
+e.plot
+
+ggsave(e.plot, file="plots/fig_s6b_deg_table.svg",  width = 3, height= 10.06)
+
+```
+
+## Fig S6C
+```{r, error=FALSE, warning=FALSE}
+data<-read.delim("data/fig_s6c_nc472.exp.txt", header=F)
+data$V2<-factor(data$V2, levels=c("Control", "Heat42C", "ROS", "NaCl", "Mannitol", "Trehalose","PreCondTre", "Rehydration"))
+ggplot(data ,aes(x=V3, y=V4)) + geom_point() + geom_line() + facet_grid(.~V2, scale="free", space="free") + geom_errorbar(aes(ymin=V4-V5, ymax=V4+V5)) + scale_x_continuous(breaks=c(0,12,24,35,48,60,72)) + theme_classic() + theme(strip.background=element_blank()) + xlab("Time point (h)") + ylab("Expression of nc472 (TPM)")
+
+ggsave("plots/fig_s6c_nc472.exp.txt.svg")
+```
+
+
+## Fig S6D
+
+```{r, error=FALSE, warning=FALSE}
+input ="data/fig_s6d_tf.txt"
+data<-read.delim(input, row.names=2)
+data<-data[apply(data[,-1], 1, mean)>1,]
+y<-data[,-1]
+mydata<-t(scale(t(y)))
+a<-data.frame(rownames(y), data[,1], mydata)
+
+colnames(a)[c(1,2)] <- c("Transcript", "Gene")
+a.melt<-melt(a, id.var=c("Transcript", "Gene"))
+a.melt2<-data.frame(a.melt[,c(1:3)], str_split_fixed(a.melt$variable, "\\_", 4),a.melt$value)
+colnames(a.melt2)<-c("Transcript", "Gene", "Full", "Origin", "Cond", "Time", "Repli", "Zvalue")
+a.melt2$Cond<-factor(a.melt2$Cond, levels=c("Control", "Heat42C", "ROS", "Mannitol", "NaCl", "Trehalose", "PreCondTre", "Rehydration"))
+a.melt2$Full<-factor(a.melt2$Full, levels=c("Pv11_Control_01_rep1","Pv11_Control_01_rep2","Pv11_Control_01_rep3","Pv11_Control_03_rep1","Pv11_Control_03_rep2","Pv11_Control_03_rep3","Pv11_Control_24_rep1","Pv11_Control_24_rep2","Pv11_Control_24_rep3","Pv11_Heat42C_01_rep1","Pv11_Heat42C_01_rep2","Pv11_Heat42C_01_rep3","Pv11_Heat42C_03_rep1","Pv11_Heat42C_03_rep2","Pv11_Heat42C_03_rep3","Pv11_Heat42C_24_rep1","Pv11_Heat42C_24_rep2","Pv11_Heat42C_24_rep3","Pv11_ROS_01_rep1","Pv11_ROS_01_rep2","Pv11_ROS_01_rep3","Pv11_ROS_03_rep1","Pv11_ROS_03_rep2","Pv11_ROS_03_rep3","Pv11_ROS_24_rep1","Pv11_ROS_24_rep2","Pv11_ROS_24_rep3","Pv11_Trehalose_01_rep1","Pv11_Trehalose_01_rep2","Pv11_Trehalose_01_rep3","Pv11_Trehalose_03_rep1","Pv11_Trehalose_03_rep2","Pv11_Trehalose_03_rep3","Pv11_Trehalose_24_rep1","Pv11_Trehalose_24_rep2","Pv11_Trehalose_24_rep3","Pv11_Mannitol_01_rep1","Pv11_Mannitol_01_rep2","Pv11_Mannitol_01_rep3","Pv11_Mannitol_03_rep1","Pv11_Mannitol_03_rep2","Pv11_Mannitol_03_rep3","Pv11_Mannitol_24_rep1","Pv11_Mannitol_24_rep2","Pv11_Mannitol_24_rep3","Pv11_NaCl_01_rep1","Pv11_NaCl_01_rep2","Pv11_NaCl_01_rep3","Pv11_NaCl_03_rep1","Pv11_NaCl_03_rep2","Pv11_NaCl_03_rep3","Pv11_NaCl_24_rep1","Pv11_NaCl_24_rep2","Pv11_NaCl_24_rep3","Pv11_PreCondTre_00_rep1","Pv11_PreCondTre_00_rep2","Pv11_PreCondTre_00_rep3","Pv11_PreCondTre_12_rep1","Pv11_PreCondTre_12_rep2","Pv11_PreCondTre_12_rep3","Pv11_PreCondTre_24_rep1","Pv11_PreCondTre_24_rep2","Pv11_PreCondTre_24_rep3","Pv11_PreCondTre_36_rep1","Pv11_PreCondTre_36_rep2","Pv11_PreCondTre_36_rep3","Pv11_PreCondTre_48_rep1","Pv11_PreCondTre_48_rep2","Pv11_PreCondTre_48_rep3","Pv11_Rehydration_00_rep1","Pv11_Rehydration_00_rep2","Pv11_Rehydration_00_rep3","Pv11_Rehydration_03_rep1","Pv11_Rehydration_03_rep2","Pv11_Rehydration_03_rep3","Pv11_Rehydration_12_rep1","Pv11_Rehydration_12_rep2","Pv11_Rehydration_12_rep3","Pv11_Rehydration_24_rep1","Pv11_Rehydration_24_rep2","Pv11_Rehydration_24_rep3","Pv11_Rehydration_72_rep1","Pv11_Rehydration_72_rep2","Pv11_Rehydration_72_rep3"))
+
+
+ggplot(a.melt2, aes(x=Full, y=Transcript, fill=Zvalue)) + theme_bw() + geom_tile(aes(color=Zvalue)) + theme(strip.background=element_rect(fill="white", color="white"),  axis.ticks=element_blank(), axis.text.x=element_text(angle=90, vjust=0.5, hjust=1), panel.spacing=unit(0, "lines"), legend.position="bottom") + scale_fill_gradient2(low = "blue", mid = "white", high = "red", lim=c(-9,9), name="Z value") + scale_color_gradient2(low = "blue", mid = "white", high = "red", lim=c(-9,9), name="Z value") +  xlab("Condition / Time Point") + ylab("") + scale_x_discrete(expand=c(0,0)) + scale_y_discrete(expand=c(0,0)) + facet_grid(Gene~Cond, scale="free", space = "free")
+
+ggsave("plots/fig_s6c_tf.svg")
+
+```
+
+
+
+
+
+
+
